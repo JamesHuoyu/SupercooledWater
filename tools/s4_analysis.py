@@ -98,7 +98,7 @@ class SimParams:
     a_threshold: float = 1.0  # Ångström; defines mobile vs immobile
 
     # ---- Time origins ----
-    n_t0: int = 100            # Number of time origins for ensemble average
+    n_t0: int = 500            # Number of time origins for ensemble average
     t0_start_frac: float = 0.1  # Skip first 10 % as transient / equilibration
 
     # ---- k-space ----
