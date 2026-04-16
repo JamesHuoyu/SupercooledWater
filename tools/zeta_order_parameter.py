@@ -80,6 +80,7 @@ import numpy as np
 
 from MDAnalysis.analysis.base import AnalysisBase, Results
 from MDAnalysis.lib.distances import capped_distance, self_capped_distance
+from MDAnalysis.lib.nsgrid import FastNS
 from MDAnalysis.exceptions import NoDataError
 
 logger = logging.getLogger(__name__)
@@ -599,6 +600,198 @@ class ZetaOrderParameter(AnalysisBase):
             }
         return result
 
+        def _compute_zeta_cg_frame(
+        self,
+        zeta: np.ndarray,
+        positions: np.ndarray,
+        box: np.ndarray,
+        L: float = 3.0,
+        rcut: Optional[float] = 3.5,
+    ) -> np.ndarray:
+        """Compute coarse-grained zeta for a single frame.
+
+        The coarse-grained field is defined as a weighted average over
+        neighbors within ``rcut``:
+
+            zeta_cg(i) = [ zeta(i) + sum_j zeta(j) exp(-r_ij / L) ] /
+                         [ 1 + sum_j exp(-r_ij / L) ]
+
+        Only neighbors with finite zeta values are included.
+
+        Parameters
+        ----------
+        zeta : np.ndarray, shape (n_central,)
+            Raw zeta values for one frame.
+        positions : np.ndarray, shape (n_central, 3)
+            Central-atom positions for the same frame.
+        box : np.ndarray
+            MDAnalysis box array (ts.dimensions).
+        L : float
+            Exponential smoothing length (Å).
+        rcut : float or None
+            Neighbor cutoff (Å). If None, uses ``3 * L``.
+
+        Returns
+        -------
+        np.ndarray, shape (n_central,)
+            Coarse-grained zeta for that frame.
+        """
+        if rcut is None:
+            rcut = 3.0 * L
+
+        zeta = np.asarray(zeta, dtype=np.float32)
+        positions = np.asarray(positions, dtype=np.float32)
+        box = np.asarray(box, dtype=np.float32)
+
+        ns = FastNS(cutoff=rcut, coords=positions, box=box, pbc=True)
+        results = ns.self_search()
+
+        pairs = results.get_pairs()
+        distances = results.get_pair_distances()
+
+        neighbor_list = [[] for _ in range(len(zeta))]
+        for (i, j), d in zip(pairs, distances):
+            i = int(i)
+            j = int(j)
+            d = float(d)
+            neighbor_list[i].append((j, d))
+            neighbor_list[j].append((i, d))
+
+        zeta_cg = np.full_like(zeta, np.nan, dtype=np.float32)
+
+        for i in range(len(zeta)):
+            zi = zeta[i]
+            if np.isnan(zi):
+                continue
+
+            weighted_sum = float(zi)
+            weight_total = 1.0
+
+            for j, r in neighbor_list[i]:
+                zj = zeta[j]
+                if np.isnan(zj):
+                    continue
+
+                w = np.exp(-r / L)
+                weighted_sum += float(zj) * w
+                weight_total += w
+
+            zeta_cg[i] = weighted_sum / weight_total
+
+        return zeta_cg
+
+
+    def compute_zeta_cg(
+        self,
+        L: float = 3.0,
+        rcut: Optional[float] = 3.5,
+        overwrite: bool = True,
+    ) -> np.ndarray:
+        """Compute coarse-grained zeta for all analysed frames.
+
+        Stores the result in ``self.results.zeta_cg``.
+
+        Parameters
+        ----------
+        L : float
+            Exponential smoothing length (Å).
+        rcut : float or None
+            Neighbor cutoff (Å). If None, uses ``3 * L``.
+        overwrite : bool
+            If False and ``results.zeta_cg`` already exists, return the
+            existing array without recomputing.
+
+        Returns
+        -------
+        np.ndarray, shape (n_frames, n_central)
+            Coarse-grained zeta array.
+        """
+        self._require_results()
+
+        if (
+            not overwrite
+            and hasattr(self.results, "zeta_cg")
+            and self.results.zeta_cg is not None
+        ):
+            return self.results.zeta_cg
+
+        zeta_cg_all = np.full_like(self.results.zeta, np.nan, dtype=np.float32)
+
+        for row, frame in enumerate(self.frames):
+            frame = int(frame)
+            self.u.trajectory[frame]
+
+            if self.update_central:
+                central_ag = self.u.select_atoms(self.central_sel)
+            else:
+                central_ag = self._central_ag
+
+            positions = central_ag.positions.copy()
+            box = self.u.trajectory.ts.dimensions.copy()
+
+            zeta_cg_all[row] = self._compute_zeta_cg_frame(
+                zeta=self.results.zeta[row],
+                positions=positions,
+                box=box,
+                L=L,
+                rcut=rcut,
+            )
+
+        self.results.zeta_cg = zeta_cg_all
+        self.results.zeta_cg_L = float(L)
+        self.results.zeta_cg_rcut = None if rcut is None else float(rcut)
+
+        logger.info(
+            "Computed zeta_cg for %d frames with L=%.3f Å, rcut=%s.",
+            len(self.frames),
+            L,
+            "None" if rcut is None else f"{rcut:.3f} Å",
+        )
+
+        return self.results.zeta_cg
+
+
+    def spatial_zeta_cg_map(self, frame: int) -> dict:
+        """Return zeta_cg value and 3-D position for each central molecule.
+
+        Parameters
+        ----------
+        frame : int
+            Absolute trajectory frame number.
+
+        Returns
+        -------
+        dict with keys:
+          ``"positions"`` : np.ndarray, shape (n_central, 3)
+          ``"zeta_cg"``   : np.ndarray, shape (n_central,)
+          ``"zeta"``      : np.ndarray, shape (n_central,)
+          ``"n_hb"``      : np.ndarray, shape (n_central,)
+        """
+        self._require_results()
+
+        if not hasattr(self.results, "zeta_cg") or self.results.zeta_cg is None:
+            raise NoDataError(
+                "No zeta_cg results yet. Call compute_zeta_cg() first."
+            )
+
+        if frame not in self._frame_to_row:
+            raise ValueError(
+                f"Frame {frame} was not analysed.  "
+                f"Available frames: {self.frames[0]} … {self.frames[-1]}."
+            )
+
+        row = self._frame_to_row[frame]
+        self.u.trajectory[frame]
+        positions = self._central_ag.positions.copy()
+
+        return {
+            "positions": positions,
+            "zeta_cg": self.results.zeta_cg[row].copy(),
+            "zeta": self.results.zeta[row].copy(),
+            "n_hb": self.results.n_hb[row].copy(),
+        }
+
+
     # ------------------------------------------------------------------
     # Save / load
     # ------------------------------------------------------------------
@@ -606,17 +799,29 @@ class ZetaOrderParameter(AnalysisBase):
     def save(self, prefix: str = "zeta"):
         """Save all result arrays to .npy files.
 
-        Files written: ``{prefix}_zeta.npy``, ``{prefix}_d_hb_far.npy``,
-        ``{prefix}_d_nonhb_near.npy``, ``{prefix}_n_hb.npy``,
-        ``{prefix}_central_indices.npy``, ``{prefix}_frames.npy``.
+        Files written:
+          ``{prefix}_zeta.npy``
+          ``{prefix}_d_hb_far.npy``
+          ``{prefix}_d_nonhb_near.npy``
+          ``{prefix}_n_hb.npy``
+          ``{prefix}_central_indices.npy``
+          ``{prefix}_frames.npy``
+
+        If available, also writes:
+          ``{prefix}_zeta_cg.npy``
         """
         self._require_results()
-        np.save(f"{prefix}_zeta.npy",           self.results.zeta)
-        np.save(f"{prefix}_d_hb_far.npy",       self.results.d_hb_far)
-        np.save(f"{prefix}_d_nonhb_near.npy",   self.results.d_nonhb_near)
-        np.save(f"{prefix}_n_hb.npy",           self.results.n_hb)
-        np.save(f"{prefix}_central_indices.npy",self.results.central_indices)
-        np.save(f"{prefix}_frames.npy",         self.frames)
+
+        np.save(f"{prefix}_zeta.npy",            self.results.zeta)
+        np.save(f"{prefix}_d_hb_far.npy",        self.results.d_hb_far)
+        np.save(f"{prefix}_d_nonhb_near.npy",    self.results.d_nonhb_near)
+        np.save(f"{prefix}_n_hb.npy",            self.results.n_hb)
+        np.save(f"{prefix}_central_indices.npy", self.results.central_indices)
+        np.save(f"{prefix}_frames.npy",          self.frames)
+
+        if hasattr(self.results, "zeta_cg") and self.results.zeta_cg is not None:
+            np.save(f"{prefix}_zeta_cg.npy", self.results.zeta_cg)
+
         logger.info("Saved zeta results with prefix '%s'.", prefix)
 
     # ------------------------------------------------------------------
