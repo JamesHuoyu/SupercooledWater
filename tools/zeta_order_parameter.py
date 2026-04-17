@@ -600,7 +600,7 @@ class ZetaOrderParameter(AnalysisBase):
             }
         return result
 
-        def _compute_zeta_cg_frame(
+    def _compute_zeta_cg_frame(
         self,
         zeta: np.ndarray,
         positions: np.ndarray,
@@ -608,7 +608,8 @@ class ZetaOrderParameter(AnalysisBase):
         L: float = 3.0,
         rcut: Optional[float] = 3.5,
     ) -> np.ndarray:
-        """Compute coarse-grained zeta for a single frame.
+        """
+        Compute coarse-grained zeta for a single frame.
 
         The coarse-grained field is defined as a weighted average over
         neighbors within ``rcut``:
@@ -687,7 +688,8 @@ class ZetaOrderParameter(AnalysisBase):
         rcut: Optional[float] = 3.5,
         overwrite: bool = True,
     ) -> np.ndarray:
-        """Compute coarse-grained zeta for all analysed frames.
+        """
+        Compute coarse-grained zeta for all analysed frames.
 
         Stores the result in ``self.results.zeta_cg``.
 
@@ -752,7 +754,8 @@ class ZetaOrderParameter(AnalysisBase):
 
 
     def spatial_zeta_cg_map(self, frame: int) -> dict:
-        """Return zeta_cg value and 3-D position for each central molecule.
+        """
+        Return zeta_cg value and 3-D position for each central molecule.
 
         Parameters
         ----------
@@ -797,7 +800,8 @@ class ZetaOrderParameter(AnalysisBase):
     # ------------------------------------------------------------------
 
     def save(self, prefix: str = "zeta"):
-        """Save all result arrays to .npy files.
+        """
+        Save all result arrays to .npy files.
 
         Files written:
           ``{prefix}_zeta.npy``
