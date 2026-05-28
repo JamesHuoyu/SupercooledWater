@@ -95,7 +95,7 @@ class SimParams:
     shear_rate: float = 5e-6  # LAMMPS real units (1/fs effectively dimensionless here)
 
     # ---- Overlap threshold ----
-    a_threshold: float = 1.0  # Ångström; defines mobile vs immobile
+    a_threshold: float = 0.4  # Ångström; defines mobile vs immobile
 
     # ---- Time origins ----
     n_t0: int = 500            # Number of time origins for ensemble average

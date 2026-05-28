@@ -78,7 +78,7 @@ class SimParams:
 
     # ---- Time origins ----
     n_t0: int         = 100      # Number of reference time origins
-    t0_start_frac: float = 0.10 # Skip first 20 % as equilibration/transient
+    t0_start_frac: float = 0.20 # Skip first 20 % as equilibration/transient
 
     # ---- Jump thresholds (adjustable) ----
     theta_c_deg: float = 48.0   # Rotational jump threshold (degrees)
@@ -93,7 +93,8 @@ class SimParams:
     n_r_bins: int     = 60      # Bins for Δr
 
     # ---- Shear ----
-    remove_affine: bool = True  # Subtract affine displacement from Δr
+    # remove_affine: bool = True  # Subtract affine displacement from Δr
+    remove_affine: bool = False
 
     # ---- Output ----
     fig_dpi: int = 300
@@ -812,9 +813,9 @@ def make_all_plots(
     # ------------------------------------------------------------------
     # Figure 1 — Orientational ACFs  C1(t) and C2(t) on log-time axis
     # ------------------------------------------------------------------
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
+    fig, ax = plt.subplots(figsize=(6.5, 5.5))
 
-    ax = axes[0]
+    # ax = axes[0]
     t_ps = lag_times_ps
     valid = t_ps > 0
     ax.semilogx(t_ps[valid], C1[valid], "o-", lw=2, ms=4, label="$C_1(t)$")
@@ -822,21 +823,24 @@ def make_all_plots(
     ax.axhline(0, color="grey", lw=0.8, ls=":")
     ax.set_xlabel("$t$  (ps)")
     ax.set_ylabel("$C_{1,2}(t)$")
-    ax.set_title("Dipole reorientation ACF")
-    ax.legend(); ax.grid(True, which="both", alpha=0.2)
+    # ax.set_title("Dipole reorientation ACF")
+    ax.legend(); ax.grid(True, alpha=0.2)
+    fig.tight_layout()
+    fig.savefig(out / "acf.pdf")
+    plt.close(fig)
 
-    ax = axes[1]
+    fig, ax = plt.subplots(figsize=(6.5, 5.5))
     ax.loglog(t_ps[valid & (theta_msad > 0)], theta_msad[valid & (theta_msad > 0)],
               "^-", lw=2, ms=5, color="darkorange")
     ax.set_xlabel("$t$  (ps)")
     ax.set_ylabel(r"$\langle \theta^2 \rangle$  (rad²)")
-    ax.set_title("Mean-squared angular displacement")
-    ax.grid(True, which="both", alpha=0.2)
+    # ax.set_title("Mean-squared angular displacement")
+    ax.grid(True, alpha=0.2)
 
     fig.tight_layout()
-    fig.savefig(out / "acf_and_msad.png", dpi=dpi)
+    fig.savefig(out / "msad.pdf")
     plt.close(fig)
-    print("  Saved acf_and_msad.png")
+    print("  Saved acf_and_msad.pdf")
 
     # ------------------------------------------------------------------
     # Figure 2 — P(θ, t) at three representative lag times
@@ -856,12 +860,12 @@ def make_all_plots(
             ax.plot(theta_deg, P_theta[li], lw=2, color=colors_p[ci], label=lab)
     ax.set_xlabel(r"$\theta$  (degrees)")
     ax.set_ylabel(r"$P(\theta, t)$  (rad$^{-1}$)")
-    ax.set_title("Angular displacement distribution")
+    # ax.set_title("Angular displacement distribution")
     ax.legend(); ax.grid(True, alpha=0.25)
     fig.tight_layout()
-    fig.savefig(out / "P_theta_t.png", dpi=dpi)
+    fig.savefig(out / "P_theta_t.pdf")
     plt.close(fig)
-    print("  Saved P_theta_t.png")
+    print("  Saved P_theta_t.pdf")
 
     # ------------------------------------------------------------------
     # Figure 3 — Joint distribution P(Δr, θ) at t*   (heatmap)
@@ -882,28 +886,29 @@ def make_all_plots(
         )
         # Mark thresholds
         theta_c_deg_val = np.rad2deg(np.deg2rad(params.theta_c_deg))
-        ax.axhline(params.r_c_angstrom, color="cyan", lw=1.5, ls="--",
-                   label=f"$r_c$ = {params.r_c_angstrom:.1f} Å")
-        ax.axvline(theta_c_deg_val, color="lime", lw=1.5, ls="--",
-                   label=f"$\\theta_c$ = {params.theta_c_deg:.0f}°")
+        # ax.axhline(params.r_c_angstrom, color="cyan", lw=1.5, ls="--",
+        #            label=f"$r_c$ = {params.r_c_angstrom:.1f} Å")
+        # ax.axvline(theta_c_deg_val, color="lime", lw=1.5, ls="--",
+        #            label=f"$\\theta_c$ = {params.theta_c_deg:.0f}°")
         plt.colorbar(im, ax=ax, label=r"$P(\Delta r,\,\theta;\,t^*)$")
         ax.set_xlabel(r"$\theta$  (degrees)")
         ax.set_ylabel(r"$\Delta r$  (Å)")
-        ax.set_title(rf"Joint distribution at $t^*$ = {lag_times_ps[tstar_idx]:.2f} ps")
+        # ax.set_title(rf"Joint distribution at $t^*$ = {lag_times_ps[tstar_idx]:.2f} ps")
         ax.legend(fontsize=8)
         fig.tight_layout()
-        fig.savefig(out / "joint_distribution.png", dpi=dpi)
+        fig.savefig(out / "joint_distribution.pdf")
         plt.close(fig)
-        print("  Saved joint_distribution.png")
+        print("  Saved joint_distribution.pdf")
 
     # ------------------------------------------------------------------
     # Figure 4 — Coupling ratio R(t) and Pearson correlation
     # ------------------------------------------------------------------
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
+    fig, ax = plt.subplots(figsize=(6.5, 5.5))
+    # fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
     R_vals = jump_stats["R"]
     pr_vals = jump_stats["pearson_r"]
 
-    ax = axes[0]
+    # ax = axes[0]
     good = np.isfinite(R_vals) & (lag_times_ps > 0)
     ax.semilogx(lag_times_ps[good], R_vals[good], "o-", lw=2, ms=5, color="crimson")
     ax.axhline(1.0, color="grey", lw=1.2, ls="--", label="$R=1$ (independent)")
@@ -911,22 +916,26 @@ def make_all_plots(
     ax.axvline(tstar_ps, color="blue", lw=1.2, ls=":", label=f"$t^*$={tstar_ps:.2f} ps")
     ax.set_xlabel("$t$  (ps)")
     ax.set_ylabel("$R(t) = P_\\mathrm{overlap} / P_\\mathrm{rand}$")
-    ax.set_title("Rotational–translational coupling")
-    ax.legend(); ax.grid(True, which="both", alpha=0.2)
+    # ax.set_title("Rotational–translational coupling")
+    ax.legend(); ax.grid(True, alpha=0.2)
+    fig.tight_layout()
+    fig.savefig(out / "coupling_R.pdf")
+    plt.close(fig)
 
-    ax = axes[1]
+    fig, ax = plt.subplots(figsize=(6.5, 5.5))
+    # ax = axes[1]
     good2 = np.isfinite(pr_vals) & (lag_times_ps > 0)
     ax.semilogx(lag_times_ps[good2], pr_vals[good2], "s-", lw=2, ms=5, color="darkorange")
     ax.axhline(0, color="grey", lw=0.8, ls=":")
     ax.set_xlabel("$t$  (ps)")
     ax.set_ylabel("Pearson $r(\\theta, \\Delta r)$")
-    ax.set_title("Linear correlation: rotation vs translation")
-    ax.grid(True, which="both", alpha=0.2)
+    # ax.set_title("Linear correlation: rotation vs translation")
+    ax.grid(True, alpha=0.2)
 
     fig.tight_layout()
-    fig.savefig(out / "coupling_R_and_pearson.png", dpi=dpi)
+    fig.savefig(out / "coupling_pearson.pdf")
     plt.close(fig)
-    print("  Saved coupling_R_and_pearson.png")
+    print("  Saved coupling_R_and_pearson.pdf")
 
     # ------------------------------------------------------------------
     # Figure 5 — Conditional averages at t*
@@ -943,27 +952,27 @@ def make_all_plots(
         ax = axes[0]
         ok = np.isfinite(mean_th_dr)
         ax.plot(dr_c[ok], np.rad2deg(mean_th_dr[ok]), "o-", lw=2, ms=5, color="purple")
-        ax.axhline(params.theta_c_deg, color="grey", ls="--",
-                   label=f"$\\theta_c$ = {params.theta_c_deg:.0f}°")
+        # ax.axhline(params.theta_c_deg, color="grey", ls="--",
+        #            label=f"$\\theta_c$ = {params.theta_c_deg:.0f}°")
         ax.set_xlabel(r"$\Delta r$  (Å)")
         ax.set_ylabel(r"$\langle \theta \mid \Delta r \rangle$  (degrees)")
-        ax.set_title(rf"Conditional mean angle at $t^*$")
+        # ax.set_title(rf"Conditional mean angle at $t^*$")
         ax.legend(); ax.grid(True, alpha=0.25)
 
         ax = axes[1]
         ok2 = np.isfinite(mean_dr_th)
         ax.plot(np.rad2deg(th_c[ok2]), mean_dr_th[ok2], "s-", lw=2, ms=5, color="teal")
-        ax.axvline(params.theta_c_deg, color="grey", ls="--",
-                   label=f"$\\theta_c$ = {params.theta_c_deg:.0f}°")
+        # ax.axvline(params.theta_c_deg, color="grey", ls="--",
+        #            label=f"$\\theta_c$ = {params.theta_c_deg:.0f}°")
         ax.set_xlabel(r"$\theta$  (degrees)")
         ax.set_ylabel(r"$\langle \Delta r \mid \theta \rangle$  (Å)")
-        ax.set_title(rf"Conditional mean displacement at $t^*$")
+        # ax.set_title(rf"Conditional mean displacement at $t^*$")
         ax.legend(); ax.grid(True, alpha=0.25)
 
         fig.tight_layout()
-        fig.savefig(out / "conditional_averages.png", dpi=dpi)
+        fig.savefig(out / "conditional_averages.pdf")
         plt.close(fig)
-        print("  Saved conditional_averages.png")
+        print("  Saved conditional_averages.pdf")
 
 
 # ============================================================
