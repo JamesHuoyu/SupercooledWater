@@ -2,30 +2,33 @@
 Reproduce Kikutsuji, Kim & Matubayasi J. Chem. Phys. 150, 204502 (2019)
 ==========================================================================
 
-Run this after placing cage_jump_analysis.py in your water/tools/ directory.
+Run this from the repository root or directly from tools/pipelines/.
 
 What this script produces
 --------------------------
-  cagejump_plots/fig2a_P_tauC.png      – P(τ_C) distribution
-  cagejump_plots/fig2b_tauC_tauHB.png  – ⟨τ_C⟩ vs τ_HB comparison
-  cagejump_plots/fig3a_P_tauJ.png      – P(τ_J) distribution
-  cagejump_plots/fig3b_P_rJ.png        – P(r_J) distribution
-  cagejump_plots/fig4a_JMSD.png        – JMSD(Θ_J)
-  cagejump_plots/fig4b_MSD.png         – MSD with plateau and 6Dt line
-  cagejump_plots/fig5_D_vs_estimate.png – D_MSD vs ρ_J D_J
-  cagejump_plots/hbond_acf.png         – c(t) with stretched-exp fit
-  cagejump_plots/rhoJ_distribution.png – per-molecule ρ_J histogram
-  cagejump_plots/zeta_vs_tauC.png      – ζ vs τ_C (requires ZOP)
-  cagejump_summary.csv                 – all scalar results
-  cagejump_*.npy                       – raw arrays
+  figures/cagejump/*.png                – figure outputs
+  results/cagejump/cagejump_summary.csv – all scalar results
+  results/cagejump/cagejump_*.npy       – raw arrays
 """
+
+from pathlib import Path
+import sys
 
 import numpy as np
 import MDAnalysis as mda
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from tools.custom_hbond_analysis import HydrogenBondAnalysis as HBA
 from tools.zeta_order_parameter  import ZetaOrderParameter  as ZOP
 from tools.cage_jump_analysis    import CageJumpAnalysis     as CJA
+
+FIGURES_DIR = PROJECT_ROOT / "figures" / "cagejump"
+RESULTS_DIR = PROJECT_ROOT / "results" / "cagejump"
+FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ============================================================================
 # 0.  System parameters – edit these to match your simulation
@@ -103,8 +106,8 @@ cja.run()
 # 5.  Generate all paper figures + save numerical results
 # ============================================================================
 
-cja.plot_all("cagejump_plots")
-cja.save_results("cagejump")
+cja.plot_all(str(FIGURES_DIR))
+cja.save_results(str(RESULTS_DIR / "cagejump"))
 
 # ============================================================================
 # 6.  Print the key numbers that appear in the paper's Figs. 2–5
@@ -176,7 +179,7 @@ print(f"\n  Ratio D_estimate/D_MSD = {r.D_estimate/r.D_MSD:.3f}  "
 # ax1.legend(loc="upper left", fontsize=9)
 # ax2.legend(loc="upper right", fontsize=9)
 # plt.tight_layout()
-# plt.savefig("cagejump_plots/fig2b_arrhenius.png", dpi=150)
+# plt.savefig(FIGURES_DIR / "fig2b_arrhenius.png", dpi=150)
 # plt.close()
 #
 # D_est_list = [r["D_estimate"] for r in records]
@@ -194,5 +197,5 @@ print(f"\n  Ratio D_estimate/D_MSD = {r.D_estimate/r.D_MSD:.3f}  "
 #        ylabel=r"$D_{MSD}$ (m²/s)",
 #        title="Fig. 5: Cage-jump model vs MSD")
 # plt.tight_layout()
-# plt.savefig("cagejump_plots/fig5_multi_T.png", dpi=150)
+# plt.savefig(FIGURES_DIR / "fig5_multi_T.png", dpi=150)
 # plt.close()

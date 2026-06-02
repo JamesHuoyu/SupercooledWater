@@ -15,21 +15,31 @@ Full workflow:
 """
 
 import os
+from pathlib import Path
+import sys
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import MDAnalysis as mda
 from scipy.optimize import linear_sum_assignment
 
-from water.tools.custom_hbond_analysis   import HydrogenBondAnalysis as HBA
-from water.tools.zeta_order_parameter    import ZetaOrderParameter   as ZOP
-from water.tools.propensity_field_clusters import (
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from tools.custom_hbond_analysis   import HydrogenBondAnalysis as HBA
+from tools.zeta_order_parameter    import ZetaOrderParameter   as ZOP
+from tools.propensity_field_clusters import (
     PropensityFieldClusters  as PFC,
     PropensityFieldTracker   as PFT,
     finalise_track_arrays,
 )
 
-os.makedirs("pfc_plots", exist_ok=True)
+PLOT_DIR = PROJECT_ROOT / "figures" / "propensity_field"
+RESULTS_DIR = PROJECT_ROOT / "results" / "propensity_field"
+PLOT_DIR.mkdir(parents=True, exist_ok=True)
+RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ============================================================================
 # 0.  Load universe and run HBA + ZOP
@@ -167,9 +177,9 @@ pfc_ref.plot_slice(axis=2, ax=axes[1],
                    show_boundaries=True, show_propensity=False,
                    title="Clusters coloured by ζ_cg at t=0")
 plt.tight_layout()
-plt.savefig("pfc_plots/ref_frame_clusters.png", dpi=150)
+plt.savefig(PLOT_DIR / "ref_frame_clusters.png", dpi=150)
 plt.close()
-print("[4] pfc_plots/ref_frame_clusters.png")
+print(f"[4] {PLOT_DIR / 'ref_frame_clusters.png'}")
 
 # ============================================================================
 # 5.  Plot 2 – Propensity vs ζ_cg scatter coloured by cluster membership
@@ -193,9 +203,9 @@ ax.set(xlabel="Propensity P_i (Å²)",
        title="Structure vs dynamics: ζ_cg vs propensity")
 ax.legend(fontsize=7, loc="upper left", ncol=2)
 plt.tight_layout()
-plt.savefig("pfc_plots/propensity_vs_zeta.png", dpi=150)
+plt.savefig(PLOT_DIR / "propensity_vs_zeta.png", dpi=150)
 plt.close()
-print("[5] pfc_plots/propensity_vs_zeta.png")
+print(f"[5] {PLOT_DIR / 'propensity_vs_zeta.png'}")
 
 # ============================================================================
 # 6.  Cluster characterisation summary at reference frame
@@ -278,9 +288,9 @@ axes[1].set(xlabel="Time (ps)", ylabel="⟨ζ_cg⟩",
             title="Mean ζ_cg per tracked cluster vs time")
 axes[1].legend(fontsize=7, ncol=2)
 plt.tight_layout()
-plt.savefig("pfc_plots/tracked_cluster_timeseries.png", dpi=150)
+plt.savefig(PLOT_DIR / "tracked_cluster_timeseries.png", dpi=150)
 plt.close()
-print("[8] pfc_plots/tracked_cluster_timeseries.png")
+print(f"[8] {PLOT_DIR / 'tracked_cluster_timeseries.png'}")
 
 # ============================================================================
 # 9.  Plot 4 – ζ_cg(t=0) histogram: inside clusters vs background
@@ -313,10 +323,10 @@ ax.text(0.98, 0.95, f"KS = {ks_stat:.3f}  p = {ks_p:.2e}",
         transform=ax.transAxes, ha="right", va="top", fontsize=9)
 
 plt.tight_layout()
-plt.savefig("pfc_plots/zeta_inside_vs_background.png", dpi=150)
+plt.savefig(PLOT_DIR / "zeta_inside_vs_background.png", dpi=150)
 plt.close()
 print(f"[9] KS test: D={ks_stat:.3f}, p={ks_p:.2e}")
-print("    pfc_plots/zeta_inside_vs_background.png")
+print(f"    {PLOT_DIR / 'zeta_inside_vs_background.png'}")
 
 # ============================================================================
 # 10. Plot 5 – Cluster CoM trajectories (top 6 tracks)
@@ -342,9 +352,9 @@ ax.set(xlabel="x (Å)", ylabel="y (Å)",
        title="Cluster CoM trajectories (top 6 by mean size)")
 ax.set_aspect("equal")
 plt.tight_layout()
-plt.savefig("pfc_plots/cluster_com_trajectories.png", dpi=150)
+plt.savefig(PLOT_DIR / "cluster_com_trajectories.png", dpi=150)
 plt.close()
-print("[10] pfc_plots/cluster_com_trajectories.png")
+print(f"[10] {PLOT_DIR / 'cluster_com_trajectories.png'}")
 
 # ============================================================================
 # 11. Plot 6 – frac_tetrahedral per cluster over time
@@ -361,9 +371,9 @@ ax.set(xlabel="Time (ps)",
        title="Tetrahedral fraction per tracked cluster")
 ax.legend(fontsize=7, ncol=2)
 plt.tight_layout()
-plt.savefig("pfc_plots/cluster_frac_tet_timeseries.png", dpi=150)
+plt.savefig(PLOT_DIR / "cluster_frac_tet_timeseries.png", dpi=150)
 plt.close()
-print("[11] pfc_plots/cluster_frac_tet_timeseries.png")
+print(f"[11] {PLOT_DIR / 'cluster_frac_tet_timeseries.png'}")
 
 # ============================================================================
 # 12. Plot 7 – Cluster lifetime distribution and size distribution
@@ -406,9 +416,9 @@ axes[1, 1].set(xlabel="Mean size N", ylabel="⟨ζ_cg⟩",
                title="Size vs structure, coloured by lifetime")
 
 plt.tight_layout()
-plt.savefig("pfc_plots/cluster_aggregate_stats.png", dpi=150)
+plt.savefig(PLOT_DIR / "cluster_aggregate_stats.png", dpi=150)
 plt.close()
-print("[12] pfc_plots/cluster_aggregate_stats.png")
+print(f"[12] {PLOT_DIR / 'cluster_aggregate_stats.png'}")
 
 # ============================================================================
 # 13. Robustness check: vary σ and active-fraction threshold
@@ -461,10 +471,10 @@ for tr in tracks.values():
         tr["com_displacement"],
     ])
 
-with open("pfc_plots/cluster_tracks_summary.csv", "w", newline="") as fh:
+with open(RESULTS_DIR / "cluster_tracks_summary.csv", "w", newline="") as fh:
     csv.writer(fh).writerows(rows)
-print(f"\n[14] pfc_plots/cluster_tracks_summary.csv  ({len(rows)-1} tracks)")
+print(f"\n[14] {RESULTS_DIR / 'cluster_tracks_summary.csv'}  ({len(rows)-1} tracks)")
 
 print("\nAll outputs:")
-for f in sorted(os.listdir("pfc_plots")):
-    print(f"  pfc_plots/{f}")
+for f in sorted(os.listdir(PLOT_DIR)):
+    print(f"  {PLOT_DIR / f}")

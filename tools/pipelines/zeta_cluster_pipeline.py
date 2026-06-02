@@ -18,6 +18,9 @@ Covers
 """
 
 import os
+from pathlib import Path
+import sys
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
@@ -27,11 +30,18 @@ from matplotlib.lines import Line2D
 from scipy.spatial import ConvexHull
 import MDAnalysis as mda
 
-from water.tools.custom_hbond_analysis import HydrogenBondAnalysis as HBA
-from water.tools.zeta_order_parameter  import ZetaOrderParameter  as ZOP
-from water.tools.zeta_cluster_analysis import ZetaClusterAnalysis  as ZCA
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-os.makedirs("cluster_plots", exist_ok=True)
+from tools.custom_hbond_analysis import HydrogenBondAnalysis as HBA
+from tools.zeta_order_parameter  import ZetaOrderParameter  as ZOP
+from tools.zeta_cluster_analysis import ZetaClusterAnalysis  as ZCA
+
+PLOT_DIR = PROJECT_ROOT / "figures" / "zeta_clusters"
+RESULTS_DIR = PROJECT_ROOT / "results" / "zeta_clusters"
+PLOT_DIR.mkdir(parents=True, exist_ok=True)
+RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ============================================================================
 # 0.  Run the full stack
@@ -199,7 +209,7 @@ def plot_spatial_slice(frame_idx, axis=2, width=5.0, ax=None, show=True):
 
     if created_fig and show:
         plt.tight_layout()
-        plt.savefig(f"cluster_plots/spatial_slice_frame{frame_idx:04d}.png",
+        plt.savefig(PLOT_DIR / f"spatial_slice_frame{frame_idx:04d}.png",
                     dpi=150)
         plt.close()
 
@@ -207,7 +217,7 @@ def plot_spatial_slice(frame_idx, axis=2, width=5.0, ax=None, show=True):
 # Plot snapshot at the first, middle, and last frames
 for fi in [0, n_frames // 2, n_frames - 1]:
     plot_spatial_slice(fi, axis=2, width=5.0, show=True)
-    print(f"Slice written: cluster_plots/spatial_slice_frame{fi:04d}.png")
+    print(f"Slice written: {PLOT_DIR / f'spatial_slice_frame{fi:04d}.png'}")
 
 # ============================================================================
 # 2.  Spatial slice animation – PNG sequence (every 10 frames)
@@ -216,7 +226,7 @@ for fi in [0, n_frames // 2, n_frames - 1]:
 print("\nWriting animation frames …")
 for fi in range(0, n_frames, max(1, n_frames // 50)):
     plot_spatial_slice(fi, axis=2, width=5.0, show=True)
-print("Animation frames written to cluster_plots/")
+print(f"Animation frames written to {PLOT_DIR}/")
 
 # ============================================================================
 # 3.  Cluster-size time series (total molecules in tet / distorted clusters)
@@ -234,7 +244,7 @@ ax.set(xlabel="Time (ps)", ylabel="Molecules in clusters",
        title="Total cluster population vs. time")
 ax.legend(fontsize=9)
 plt.tight_layout()
-plt.savefig("cluster_plots/cluster_population_timeseries.png", dpi=150)
+plt.savefig(PLOT_DIR / "cluster_population_timeseries.png", dpi=150)
 plt.close()
 
 # ============================================================================
@@ -262,7 +272,7 @@ for ax, cls, name, color in zip(
           f"max={lifetimes_ps.max():.2f} ps")
 
 plt.tight_layout()
-plt.savefig("cluster_plots/cluster_lifetime_distribution.png", dpi=150)
+plt.savefig(PLOT_DIR / "cluster_lifetime_distribution.png", dpi=150)
 plt.close()
 
 # ============================================================================
@@ -288,7 +298,7 @@ for ax, cls, name, color in zip(
           f"max N={all_sizes.max()}")
 
 plt.tight_layout()
-plt.savefig("cluster_plots/cluster_size_distribution.png", dpi=150)
+plt.savefig(PLOT_DIR / "cluster_size_distribution.png", dpi=150)
 plt.close()
 
 # ============================================================================
@@ -325,7 +335,7 @@ ax.set(xlabel="Cluster size N",
        title="⟨Rg⟩ vs cluster size")
 ax.legend(fontsize=9)
 plt.tight_layout()
-plt.savefig("cluster_plots/rg_vs_size.png", dpi=150)
+plt.savefig(PLOT_DIR / "rg_vs_size.png", dpi=150)
 plt.close()
 
 # ============================================================================
@@ -365,7 +375,7 @@ for ax, cls, name in zip(axes, [+1, -1], ["Tetrahedral", "Distorted"]):
     ax.legend(fontsize=7, loc="upper left")
 
 plt.tight_layout()
-plt.savefig("cluster_plots/com_trajectories.png", dpi=150)
+plt.savefig(PLOT_DIR / "com_trajectories.png", dpi=150)
 plt.close()
 
 # ============================================================================
@@ -418,7 +428,7 @@ ax.set(xlabel="Lag time τ (ps)",
        title="Cluster centre-of-mass MSD")
 ax.legend(fontsize=9)
 plt.tight_layout()
-plt.savefig("cluster_plots/cluster_com_msd.png", dpi=150)
+plt.savefig(PLOT_DIR / "cluster_com_msd.png", dpi=150)
 plt.close()
 
 # ============================================================================
@@ -468,7 +478,7 @@ for ax, cls, name in zip(axes, [+1, -1], ["Tetrahedral clusters", "Distorted clu
     ax.set(xlabel="Time (ps)", ylabel="ζ (Å)", title=name)
 
 plt.tight_layout()
-plt.savefig("cluster_plots/cluster_zeta_heatmap.png", dpi=150)
+plt.savefig(PLOT_DIR / "cluster_zeta_heatmap.png", dpi=150)
 plt.close()
 
 # ============================================================================
@@ -518,14 +528,14 @@ for gid, track in sorted(zca.results.tracks.items()):
 if rows:
     import csv
     fieldnames = list(rows[0].keys())
-    with open("cluster_plots/cluster_track_summary.csv", "w", newline="") as fh:
+    with open(RESULTS_DIR / "cluster_track_summary.csv", "w", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
-    print(f"\nPer-track CSV: cluster_plots/cluster_track_summary.csv  "
+    print(f"\nPer-track CSV: {RESULTS_DIR / 'cluster_track_summary.csv'}  "
           f"({len(rows)} rows)")
 
-print("\nAll outputs in cluster_plots/:")
+print(f"\nAll figure outputs in {PLOT_DIR}/:")
 for fname in [
     "spatial_slice_frame*.png  (snapshots + animation frames)",
     "cluster_population_timeseries.png",
