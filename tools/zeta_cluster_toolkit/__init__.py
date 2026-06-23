@@ -26,6 +26,9 @@ from .geometry import (
     query_pairs_pbc,
     query_ball_point_pbc,
     positions_to_unsheared_orthogonal,
+    positions_to_brick_coordinates,
+    brick_to_cartesian_coordinates,
+    unwrap_cluster_positions,
 )
 
 from .io_helpers import (
@@ -55,6 +58,7 @@ from .visualization import (
     plot_single_cluster_3d_plotly,
     plot_domains_3d_matplotlib,
     plot_track_boundary_evolution,
+    collect_track_boundary_points,
 )
 
 from .tracking import (

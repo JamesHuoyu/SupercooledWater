@@ -325,3 +325,106 @@ def cart_to_frac(positions, box):
 
 def frac_to_cart(frac, box):
     return _frac_to_cart_for_visualization(frac, box)
+
+# -----------------------------------------------------------------------------
+# v6 visualization-only coordinate utilities
+# -----------------------------------------------------------------------------
+
+def positions_to_brick_coordinates(positions, box, wrap=True, reference=None) -> np.ndarray:
+    """
+    Map coordinates from the triclinic simulation cell into a rectangular
+    ``brick`` display cell.
+
+    This function is deliberately for visualization only.  It is useful for
+    plotting slices because it cuts the tilted triclinic cell along periodic
+    boundaries and pastes it into a rectangular box with side lengths
+    ``[lx, ly, lz]``.  Connectivity, MIC distances, centroid matching, and
+    tracking should still use MDAnalysis' triclinic PBC routines.
+
+    Parameters
+    ----------
+    positions : array, shape (N, 3)
+        Cartesian coordinates in the sheared/triclinic cell.
+    box : array-like
+        MDAnalysis dimensions, orthorhombic lengths, or a 3x3 triclinic matrix.
+    wrap : bool, default True
+        If True, wrap fractional coordinates to [0, 1) before mapping to the
+        brick cell.  This is the mode for whole-frame slice plots.
+    reference : array-like, shape (3,), optional
+        If given, positions are first locally unwrapped around this reference
+        point using MDAnalysis MIC vectors.  This is the mode for one-cluster
+        boundary plots, where a cluster may cross a periodic boundary.
+
+    Returns
+    -------
+    brick : ndarray, shape (N, 3)
+        Coordinates in an orthogonal display box with lengths [lx, ly, lz].
+    """
+    pos = np.asarray(positions, dtype=float)
+    if pos.ndim == 1:
+        pos = pos.reshape(1, 3)
+        squeeze = True
+    else:
+        squeeze = False
+
+    if reference is not None:
+        pos_use = unwrap_positions_relative(pos, reference, box)
+    else:
+        pos_use = wrap_positions_pbc(pos, box) if wrap else pos
+
+    frac = _cart_to_frac_for_visualization(pos_use, box)
+    if wrap and reference is None:
+        frac = frac - np.floor(frac)
+    brick = frac * cell_lengths(box)[None, :]
+    return brick[0] if squeeze else brick
+
+
+def brick_to_cartesian_coordinates(brick_positions, box) -> np.ndarray:
+    """
+    Convert visualization brick coordinates back into Cartesian triclinic-cell
+    coordinates.  This is mainly useful for debugging visualization transforms.
+    """
+    brick = np.asarray(brick_positions, dtype=float)
+    squeeze = False
+    if brick.ndim == 1:
+        brick = brick.reshape(1, 3)
+        squeeze = True
+    frac = brick / cell_lengths(box)[None, :]
+    cart = _frac_to_cart_for_visualization(frac, box)
+    return cart[0] if squeeze else cart
+
+
+def unwrap_cluster_positions(positions_wrapped, box, reference=None, reference_index=0) -> np.ndarray:
+    """
+    Locally unwrap a compact cluster using MDAnalysis MIC vectors.
+
+    Parameters
+    ----------
+    positions_wrapped : array, shape (N, 3)
+        Wrapped Cartesian coordinates of the cluster members.
+    box : array-like
+        Simulation cell.
+    reference : array-like, optional
+        Reference point.  If omitted, ``positions_wrapped[reference_index]`` is
+        used.
+    reference_index : int, default 0
+        Member used as the reference when ``reference`` is None.
+
+    Returns
+    -------
+    unwrapped : ndarray, shape (N, 3)
+        Cluster coordinates unwrapped into one compact image.
+    """
+    pos = np.asarray(positions_wrapped, dtype=float)
+    if pos.size == 0:
+        return pos.reshape((-1, 3))
+    pos_w = wrap_positions_pbc(pos, box)
+    if reference is None:
+        reference = pos_w[int(reference_index) % len(pos_w)]
+    return unwrap_positions_relative(pos_w, reference, box)
+
+
+# Keep the old name as a strict alias: it is a brick/de-skew display transform,
+# not a distance or connectivity algorithm.
+def positions_to_unsheared_orthogonal(positions, box, reference=None) -> np.ndarray:  # noqa: F811
+    return positions_to_brick_coordinates(positions, box, wrap=(reference is None), reference=reference)
